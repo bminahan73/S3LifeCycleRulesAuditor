@@ -1,10 +1,10 @@
-import 'source-map-support/register';
 import { Bucket, StorageClass, EventType } from '@aws-cdk/aws-s3';
 import { AssetCode, Function, Runtime } from '@aws-cdk/aws-lambda';
 import { App, Construct, StackProps, Stack, Duration, CfnOutput } from '@aws-cdk/core';
 import { LambdaDestination } from '@aws-cdk/aws-s3-notifications';
 import { Topic } from '@aws-cdk/aws-sns';
 import { EmailSubscription } from '@aws-cdk/aws-sns-subscriptions';
+import { PolicyStatement } from '@aws-cdk/aws-iam';
 
 export class S3LifeCycleRulesAuditorStack extends Stack {
     constructor(scope: Construct, id: string, emailAddress: string, props?: StackProps) {
@@ -18,7 +18,7 @@ export class S3LifeCycleRulesAuditorStack extends Stack {
             transitions: [
                 {
                     storageClass: StorageClass.GLACIER,
-                    transitionAfter: Duration.days(7)
+                    transitionAfter: Duration.days(7),
                 }
             ]
         });
@@ -34,17 +34,30 @@ export class S3LifeCycleRulesAuditorStack extends Stack {
             ]
         });
 
-        const topic = new Topic(this, "LifeCycleAuditTopic");
+        const topic = new Topic(this, 'LifeCycleAuditTopic');
 
         topic.addSubscription(new EmailSubscription(emailAddress));
 
         const lambda = new Function(this, 'LifeCycleAuditor', {
             runtime: Runtime.NODEJS_10_X,
             handler: 'index.handler',
-            code: new AssetCode('src'),
+            code: new AssetCode('lambdas/s3_life_cycle_rules_auditor'),
             environment: {
                 topic_arn: topic.topicArn
-            }
+            },
+            initialPolicy: [
+                new PolicyStatement({
+                    actions: ["sns:Publish"],
+                    resources: [topic.topicArn]
+                }),
+                new PolicyStatement({
+                    actions: [
+                        "s3:ListBucket",
+                        "s3:GetLifecycleConfiguration"
+                    ],
+                    resources: [bucket.bucketArn]
+                })
+            ]
         });
 
         bucket.addEventNotification(EventType.OBJECT_CREATED, new LambdaDestination(lambda));
