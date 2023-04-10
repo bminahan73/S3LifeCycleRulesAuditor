@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^13.11.1",
-    "aws-sdk": "^2.814.0",
+    "aws-sdk": "^2.1354.0",
     "ts-node": "^8.8.2",
     "typescript": "^3.8.3"
   },
